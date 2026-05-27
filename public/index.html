@@ -1,0 +1,1185 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Claude Chat</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Tiempos+Headline:wght@400;500&family=Söhne:wght@300;400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #1a1915;
+    --bg2: #201f1b;
+    --bg3: #2a2925;
+    --surface: #252420;
+    --surface2: #2f2e29;
+    --border: rgba(255,255,255,0.08);
+    --border2: rgba(255,255,255,0.13);
+    --text: #f0ede6;
+    --text2: #a09d96;
+    --text3: #6b6860;
+    --accent: #d4a853;
+    --accent2: #b8894a;
+    --accent-dim: rgba(212,168,83,0.12);
+    --accent-glow: rgba(212,168,83,0.06);
+    --user-bubble: #2e3d2e;
+    --user-text: #c8e6c9;
+    --radius: 14px;
+    --radius-sm: 8px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    font-weight: 300;
+    min-height: 100vh;
+    overflow: hidden;
+  }
+
+  /* ── noise overlay ── */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 0;
+    opacity: 0.5;
+  }
+
+  /* ── pages ── */
+  .page {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    z-index: 1;
+    transition: opacity 0.35s ease, transform 0.35s ease;
+  }
+  .page.hidden {
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(12px);
+  }
+
+  /* ══════════════════ AUTH PAGES ══════════════════ */
+  .auth-page {
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    background: var(--bg);
+  }
+
+  .auth-deco {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    overflow: hidden;
+  }
+  .auth-deco::before {
+    content: '';
+    position: absolute;
+    width: 600px;
+    height: 600px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(212,168,83,0.07) 0%, transparent 70%);
+    top: -200px;
+    right: -200px;
+  }
+  .auth-deco::after {
+    content: '';
+    position: absolute;
+    width: 400px;
+    height: 400px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(212,168,83,0.04) 0%, transparent 70%);
+    bottom: -100px;
+    left: -100px;
+  }
+
+  .auth-box {
+    width: 100%;
+    max-width: 400px;
+    padding: 0 24px;
+    animation: fadeUp 0.5s ease forwards;
+  }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .auth-logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 40px;
+  }
+  .logo-mark {
+    width: 34px;
+    height: 34px;
+  }
+  .logo-name {
+    font-family: 'Playfair Display', serif;
+    font-size: 20px;
+    font-weight: 400;
+    letter-spacing: 0.02em;
+    color: var(--text);
+  }
+
+  .auth-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 28px;
+    font-weight: 400;
+    color: var(--text);
+    margin-bottom: 8px;
+    line-height: 1.3;
+  }
+  .auth-sub {
+    font-size: 14px;
+    color: var(--text3);
+    margin-bottom: 36px;
+    line-height: 1.6;
+  }
+
+  .form-group {
+    margin-bottom: 16px;
+  }
+  .form-label {
+    display: block;
+    font-size: 12px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text3);
+    margin-bottom: 8px;
+    font-weight: 400;
+  }
+  .form-input {
+    width: 100%;
+    background: var(--surface);
+    border: 0.5px solid var(--border2);
+    border-radius: var(--radius-sm);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 15px;
+    font-weight: 300;
+    padding: 12px 16px;
+    outline: none;
+    transition: border-color 0.2s, background 0.2s;
+  }
+  .form-input::placeholder { color: var(--text3); }
+  .form-input:focus {
+    border-color: var(--accent);
+    background: var(--surface2);
+  }
+  .form-input.small { padding: 10px 14px; font-size: 13px; }
+
+  .form-hint {
+    font-size: 11px;
+    color: var(--text3);
+    margin-top: 5px;
+  }
+
+  .btn-primary {
+    width: 100%;
+    background: var(--accent);
+    color: #1a1915;
+    border: none;
+    border-radius: var(--radius-sm);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 14px;
+    font-weight: 500;
+    letter-spacing: 0.04em;
+    padding: 13px;
+    cursor: pointer;
+    transition: background 0.2s, transform 0.1s;
+    margin-top: 8px;
+  }
+  .btn-primary:hover { background: var(--accent2); }
+  .btn-primary:active { transform: scale(0.99); }
+
+  .auth-switch {
+    margin-top: 24px;
+    font-size: 13px;
+    color: var(--text3);
+    text-align: center;
+  }
+  .auth-link {
+    color: var(--accent);
+    cursor: pointer;
+    text-decoration: none;
+    transition: opacity 0.15s;
+  }
+  .auth-link:hover { opacity: 0.75; }
+
+  .divider {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 24px 0;
+  }
+  .divider-line { flex: 1; height: 0.5px; background: var(--border); }
+  .divider-text { font-size: 12px; color: var(--text3); letter-spacing: 0.06em; }
+
+  /* ══════════════════ CHAT PAGE ══════════════════ */
+  .chat-page {
+    flex-direction: row;
+  }
+
+  /* sidebar */
+  .sidebar {
+    width: 240px;
+    min-width: 240px;
+    background: var(--bg2);
+    border-right: 0.5px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    padding: 0;
+    overflow: hidden;
+  }
+
+  .sidebar-header {
+    padding: 18px 16px 14px;
+    border-bottom: 0.5px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .sidebar-logo {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .sidebar-logo-name {
+    font-family: 'Playfair Display', serif;
+    font-size: 16px;
+    font-weight: 400;
+    color: var(--text);
+  }
+
+  .new-chat-btn {
+    width: 28px;
+    height: 28px;
+    border: 0.5px solid var(--border2);
+    border-radius: 6px;
+    background: transparent;
+    color: var(--text2);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    transition: background 0.15s, color 0.15s;
+  }
+  .new-chat-btn:hover { background: var(--surface); color: var(--text); }
+
+  .sidebar-section {
+    padding: 16px 12px 6px;
+  }
+  .sidebar-section-label {
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text3);
+    padding: 0 4px;
+    margin-bottom: 6px;
+  }
+
+  .chat-item {
+    padding: 8px 10px;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    font-size: 13px;
+    color: var(--text2);
+    transition: background 0.15s, color 0.15s;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 1.5;
+  }
+  .chat-item:hover { background: var(--surface); color: var(--text); }
+  .chat-item.active { background: var(--surface); color: var(--text); }
+
+  .sidebar-footer {
+    margin-top: auto;
+    padding: 12px;
+    border-top: 0.5px solid var(--border);
+  }
+  .user-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 8px;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .user-row:hover { background: var(--surface); }
+  .user-avatar {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: var(--accent-dim);
+    border: 0.5px solid var(--accent);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    color: var(--accent);
+    font-weight: 500;
+    flex-shrink: 0;
+  }
+  .user-name {
+    font-size: 13px;
+    color: var(--text2);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* main */
+  .chat-main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: var(--bg);
+  }
+
+  .chat-topbar {
+    padding: 14px 24px;
+    border-bottom: 0.5px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--bg);
+  }
+  .chat-model-pill {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--surface);
+    border: 0.5px solid var(--border2);
+    border-radius: 20px;
+    padding: 5px 12px;
+    cursor: pointer;
+    font-size: 12px;
+    color: var(--text2);
+    transition: background 0.15s;
+    position: relative;
+  }
+  .chat-model-pill:hover { background: var(--surface2); color: var(--text); }
+  .chat-model-pill .dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--accent);
+    flex-shrink: 0;
+  }
+  .model-dropdown {
+    position: absolute;
+    top: calc(100% + 8px);
+    left: 0;
+    background: var(--surface2);
+    border: 0.5px solid var(--border2);
+    border-radius: var(--radius-sm);
+    padding: 6px;
+    min-width: 200px;
+    display: none;
+    z-index: 100;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+  }
+  .model-dropdown.open { display: block; }
+  .model-option {
+    padding: 8px 10px;
+    border-radius: 6px;
+    font-size: 13px;
+    color: var(--text2);
+    cursor: pointer;
+    transition: background 0.1s, color 0.1s;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+  }
+  .model-option:hover { background: var(--surface); color: var(--text); }
+  .model-option.selected { color: var(--accent); }
+  .model-option-sub { font-size: 11px; color: var(--text3); }
+  .topbar-right { display: flex; gap: 8px; align-items: center; }
+  .icon-btn {
+    width: 30px; height: 30px;
+    background: transparent;
+    border: 0.5px solid var(--border);
+    border-radius: 6px;
+    color: var(--text3);
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px;
+    transition: background 0.15s, color 0.15s;
+  }
+  .icon-btn:hover { background: var(--surface); color: var(--text); }
+
+  /* messages */
+  .messages-area {
+    flex: 1;
+    overflow-y: auto;
+    padding: 32px 0;
+    scrollbar-width: thin;
+    scrollbar-color: var(--surface2) transparent;
+  }
+  .messages-area::-webkit-scrollbar { width: 4px; }
+  .messages-area::-webkit-scrollbar-thumb { background: var(--surface2); border-radius: 2px; }
+
+  .msg-wrap {
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 0 24px;
+  }
+
+  .welcome {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 80px 24px 40px;
+  }
+  .welcome-icon {
+    width: 52px;
+    height: 52px;
+    margin-bottom: 20px;
+    opacity: 0.9;
+  }
+  .welcome-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 26px;
+    font-weight: 400;
+    color: var(--text);
+    margin-bottom: 10px;
+  }
+  .welcome-sub {
+    font-size: 15px;
+    color: var(--text3);
+    line-height: 1.7;
+    max-width: 360px;
+  }
+  .welcome-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 28px;
+    justify-content: center;
+  }
+  .chip {
+    background: var(--surface);
+    border: 0.5px solid var(--border2);
+    border-radius: 20px;
+    padding: 7px 14px;
+    font-size: 13px;
+    color: var(--text2);
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+  }
+  .chip:hover { background: var(--surface2); color: var(--text); border-color: var(--border2); }
+
+  .message {
+    margin-bottom: 28px;
+    animation: msgIn 0.3s ease forwards;
+  }
+  @keyframes msgIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .message.user .msg-content {
+    background: var(--user-bubble);
+    border: 0.5px solid rgba(100,180,100,0.15);
+    border-radius: var(--radius) var(--radius) 4px var(--radius);
+    padding: 12px 16px;
+    color: var(--user-text);
+    font-size: 15px;
+    line-height: 1.65;
+    max-width: 85%;
+    margin-left: auto;
+    width: fit-content;
+  }
+
+  .message.ai .msg-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+  .ai-avatar {
+    width: 24px;
+    height: 24px;
+    flex-shrink: 0;
+  }
+  .ai-name {
+    font-size: 12px;
+    color: var(--text3);
+    letter-spacing: 0.04em;
+    font-weight: 400;
+  }
+  .message.ai .msg-content {
+    font-size: 15px;
+    color: var(--text);
+    line-height: 1.75;
+    padding-left: 32px;
+  }
+
+  .thinking-dots {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+    padding-left: 32px;
+    padding-bottom: 4px;
+  }
+  .thinking-dots span {
+    width: 5px;
+    height: 5px;
+    background: var(--text3);
+    border-radius: 50%;
+    animation: pulse 1.4s infinite ease-in-out;
+  }
+  .thinking-dots span:nth-child(2) { animation-delay: 0.2s; }
+  .thinking-dots span:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes pulse {
+    0%,80%,100% { transform: scale(0.6); opacity: 0.3; }
+    40% { transform: scale(1); opacity: 1; }
+  }
+
+  /* input */
+  .input-area {
+    padding: 16px 24px 20px;
+    background: var(--bg);
+    border-top: 0.5px solid var(--border);
+  }
+  .input-wrap {
+    max-width: 720px;
+    margin: 0 auto;
+    position: relative;
+  }
+  .input-box {
+    background: var(--surface);
+    border: 0.5px solid var(--border2);
+    border-radius: var(--radius);
+    display: flex;
+    align-items: flex-end;
+    gap: 8px;
+    padding: 12px 14px;
+    transition: border-color 0.2s;
+  }
+  .input-box:focus-within { border-color: var(--accent); }
+  .input-box textarea {
+    flex: 1;
+    background: transparent;
+    border: none;
+    outline: none;
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 15px;
+    font-weight: 300;
+    line-height: 1.6;
+    resize: none;
+    min-height: 24px;
+    max-height: 140px;
+    overflow-y: auto;
+  }
+  .input-box textarea::placeholder { color: var(--text3); }
+  .send-btn {
+    width: 32px;
+    height: 32px;
+    background: var(--accent);
+    border: none;
+    border-radius: 8px;
+    color: #1a1915;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: background 0.15s, transform 0.1s;
+    font-size: 14px;
+  }
+  .send-btn:hover { background: var(--accent2); }
+  .send-btn:active { transform: scale(0.94); }
+  .send-btn:disabled { background: var(--surface2); color: var(--text3); cursor: not-allowed; }
+  .input-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 8px;
+    padding: 0 2px;
+  }
+  .input-hint { font-size: 11px; color: var(--text3); }
+  .key-badge {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--surface);
+    border: 0.5px solid var(--border);
+    border-radius: 6px;
+    padding: 4px 10px;
+    font-size: 11px;
+    color: var(--text3);
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .key-badge:hover { background: var(--surface2); }
+  .key-badge .dot-sm {
+    width: 5px; height: 5px;
+    border-radius: 50%;
+    background: var(--accent);
+  }
+
+  /* key modal */
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 999;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s;
+    backdrop-filter: blur(4px);
+  }
+  .modal-overlay.open { opacity: 1; pointer-events: all; }
+  .modal {
+    background: var(--surface);
+    border: 0.5px solid var(--border2);
+    border-radius: var(--radius);
+    padding: 28px;
+    width: 380px;
+    max-width: 90vw;
+    animation: fadeUp 0.25s ease forwards;
+  }
+  .modal-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 18px;
+    font-weight: 400;
+    margin-bottom: 6px;
+  }
+  .modal-sub { font-size: 13px; color: var(--text3); margin-bottom: 20px; line-height: 1.6; }
+  .modal-actions { display: flex; gap: 8px; margin-top: 20px; }
+  .btn-ghost {
+    flex: 1;
+    background: transparent;
+    border: 0.5px solid var(--border2);
+    border-radius: var(--radius-sm);
+    color: var(--text2);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 13px;
+    padding: 10px;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .btn-ghost:hover { background: var(--surface2); }
+  .btn-accent {
+    flex: 1;
+    background: var(--accent);
+    border: none;
+    border-radius: var(--radius-sm);
+    color: #1a1915;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 13px;
+    font-weight: 500;
+    padding: 10px;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .btn-accent:hover { background: var(--accent2); }
+
+  /* logout confirm */
+  .logout-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 8px;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    font-size: 13px;
+    color: var(--text3);
+    transition: background 0.15s, color 0.15s;
+    margin-top: 2px;
+  }
+  .logout-row:hover { background: var(--surface); color: var(--text2); }
+
+  /* scrollbar for sidebar */
+  .sidebar-chats {
+    overflow-y: auto;
+    flex: 1;
+    scrollbar-width: thin;
+    scrollbar-color: var(--surface2) transparent;
+  }
+</style>
+</head>
+<body>
+
+<!-- ══ LOGIN PAGE ══ -->
+<div class="page auth-page" id="page-login">
+  <div class="auth-deco"></div>
+  <div class="auth-box">
+    <div class="auth-logo">
+      <svg class="logo-mark" viewBox="0 0 34 34" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M17 3 C9.268 3 3 9.268 3 17 C3 24.732 9.268 31 17 31 C24.732 31 31 24.732 31 17 C31 9.268 24.732 3 17 3Z" stroke="#d4a853" stroke-width="1" fill="none" opacity="0.5"/>
+        <path d="M11 22 L17 10 L23 22" stroke="#d4a853" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+        <path d="M13 18.5 L21 18.5" stroke="#d4a853" stroke-width="1.5" stroke-linecap="round" fill="none"/>
+      </svg>
+      <span class="logo-name">Claude</span>
+    </div>
+    <h1 class="auth-title">С возвращением</h1>
+    <p class="auth-sub">Войдите, чтобы продолжить работу с Claude</p>
+
+    <div class="form-group">
+      <label class="form-label">Email</label>
+      <input class="form-input" type="email" placeholder="you@example.com" id="login-email">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Пароль</label>
+      <input class="form-input" type="password" placeholder="••••••••" id="login-pass">
+    </div>
+
+    <button class="btn-primary" onclick="doLogin()">Войти</button>
+
+    <div class="auth-switch">
+      Нет аккаунта? <span class="auth-link" onclick="showPage('register')">Зарегистрироваться</span>
+    </div>
+
+    <div class="divider">
+      <div class="divider-line"></div>
+      <span class="divider-text">или</span>
+      <div class="divider-line"></div>
+    </div>
+
+    <div class="form-group" style="margin-bottom:0">
+      <label class="form-label">API-ключ Tessera (необязательно)</label>
+      <input class="form-input small" type="password" placeholder="sk-ant-tsr-..." id="login-key">
+      <div class="form-hint">Можно добавить позже в настройках чата</div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ REGISTER PAGE ══ -->
+<div class="page auth-page hidden" id="page-register">
+  <div class="auth-deco"></div>
+  <div class="auth-box">
+    <div class="auth-logo">
+      <svg class="logo-mark" viewBox="0 0 34 34" fill="none">
+        <path d="M17 3 C9.268 3 3 9.268 3 17 C3 24.732 9.268 31 17 31 C24.732 31 31 24.732 31 17 C31 9.268 24.732 3 17 3Z" stroke="#d4a853" stroke-width="1" fill="none" opacity="0.5"/>
+        <path d="M11 22 L17 10 L23 22" stroke="#d4a853" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+        <path d="M13 18.5 L21 18.5" stroke="#d4a853" stroke-width="1.5" stroke-linecap="round" fill="none"/>
+      </svg>
+      <span class="logo-name">Claude</span>
+    </div>
+    <h1 class="auth-title">Создать аккаунт</h1>
+    <p class="auth-sub">Зарегистрируйтесь, чтобы начать использовать Claude</p>
+
+    <div class="form-group">
+      <label class="form-label">Имя</label>
+      <input class="form-input" type="text" placeholder="Иван Иванов" id="reg-name">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Email</label>
+      <input class="form-input" type="email" placeholder="you@example.com" id="reg-email">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Пароль</label>
+      <input class="form-input" type="password" placeholder="Минимум 8 символов" id="reg-pass">
+    </div>
+    <div class="form-group">
+      <label class="form-label">API-ключ Tessera</label>
+      <input class="form-input" type="password" placeholder="sk-ant-tsr-..." id="reg-key">
+      <div class="form-hint">Получите ключ в Telegram-боте Tessera</div>
+    </div>
+
+    <button class="btn-primary" onclick="doRegister()">Создать аккаунт</button>
+
+    <div class="auth-switch">
+      Уже есть аккаунт? <span class="auth-link" onclick="showPage('login')">Войти</span>
+    </div>
+  </div>
+</div>
+
+<!-- ══ CHAT PAGE ══ -->
+<div class="page chat-page hidden" id="page-chat">
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <div class="sidebar-logo">
+        <svg width="22" height="22" viewBox="0 0 34 34" fill="none">
+          <path d="M17 3 C9.268 3 3 9.268 3 17 C3 24.732 9.268 31 17 31 C24.732 31 31 24.732 31 17 C31 9.268 24.732 3 17 3Z" stroke="#d4a853" stroke-width="1" fill="none" opacity="0.5"/>
+          <path d="M11 22 L17 10 L23 22" stroke="#d4a853" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+          <path d="M13 18.5 L21 18.5" stroke="#d4a853" stroke-width="1.5" stroke-linecap="round" fill="none"/>
+        </svg>
+        <span class="sidebar-logo-name">Claude</span>
+      </div>
+      <button class="new-chat-btn" onclick="newChat()" title="Новый чат">+</button>
+    </div>
+
+    <div class="sidebar-chats">
+      <div class="sidebar-section">
+        <div class="sidebar-section-label">Сегодня</div>
+        <div class="chat-item active" onclick="selectChat(this)">Новый чат</div>
+      </div>
+    </div>
+
+    <div class="sidebar-footer">
+      <div class="user-row" onclick="toggleLogout()">
+        <div class="user-avatar" id="sidebar-avatar">И</div>
+        <div class="user-name" id="sidebar-name">Иван</div>
+      </div>
+      <div class="logout-row" id="logout-row" style="display:none" onclick="doLogout()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        Выйти
+      </div>
+    </div>
+  </aside>
+
+  <main class="chat-main">
+    <div class="chat-topbar">
+      <div class="chat-model-pill" onclick="toggleModelDropdown()" id="model-pill">
+        <span class="dot"></span>
+        <span id="model-label">Claude Sonnet 4.6</span>
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+        <div class="model-dropdown" id="model-dropdown">
+          <div class="model-option" data-model="claude-haiku-4-5" data-label="Claude Haiku 4.5" onclick="selectModel(this)">
+            Haiku 4.5
+            <span class="model-option-sub">Быстрый · дешевле</span>
+          </div>
+          <div class="model-option selected" data-model="claude-sonnet-4-6" data-label="Claude Sonnet 4.6" onclick="selectModel(this)">
+            Sonnet 4.6
+            <span class="model-option-sub">Сбалансированный</span>
+          </div>
+          <div class="model-option" data-model="claude-opus-4-7" data-label="Claude Opus 4.7" onclick="selectModel(this)">
+            Opus 4.7
+            <span class="model-option-sub">Мощный · флагман</span>
+          </div>
+        </div>
+      </div>
+      <div class="topbar-right">
+        <button class="icon-btn" onclick="openKeyModal()" title="API ключ">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>
+        </button>
+        <button class="icon-btn" onclick="newChat()" title="Новый чат">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <div class="messages-area" id="messages-area">
+      <div class="msg-wrap">
+        <div class="welcome" id="welcome">
+          <svg class="welcome-icon" viewBox="0 0 52 52" fill="none">
+            <circle cx="26" cy="26" r="24" stroke="#d4a853" stroke-width="0.5" opacity="0.4"/>
+            <path d="M18 36 L26 18 L34 36" stroke="#d4a853" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+            <path d="M20.5 30.5 L31.5 30.5" stroke="#d4a853" stroke-width="1.5" stroke-linecap="round"/>
+          </svg>
+          <div class="welcome-title">Чем могу помочь?</div>
+          <div class="welcome-sub">Задайте вопрос или выберите один из вариантов ниже</div>
+          <div class="welcome-chips">
+            <div class="chip" onclick="sendChip('Объясни квантовые вычисления простыми словами')">Квантовые вычисления</div>
+            <div class="chip" onclick="sendChip('Напиши короткий рассказ о роботе, который хочет стать художником')">Написать рассказ</div>
+            <div class="chip" onclick="sendChip('Помоги разобраться с регулярными выражениями в Python')">Regex в Python</div>
+            <div class="chip" onclick="sendChip('Каковы плюсы и минусы удалённой работы?')">Удалённая работа</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="input-area">
+      <div class="input-wrap">
+        <div class="input-box">
+          <textarea id="msg-input" placeholder="Напишите сообщение..." rows="1"
+            onkeydown="handleKey(event)" oninput="autoResize(this)"></textarea>
+          <button class="send-btn" id="send-btn" onclick="sendMessage()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+          </button>
+        </div>
+        <div class="input-footer">
+          <span class="input-hint">Enter — отправить · Shift+Enter — новая строка</span>
+          <div class="key-badge" onclick="openKeyModal()" id="key-badge">
+            <span class="dot-sm"></span>
+            <span id="key-status">Ключ не задан</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- ══ KEY MODAL ══ -->
+<div class="modal-overlay" id="key-modal">
+  <div class="modal">
+    <div class="modal-title">API-ключ Tessera</div>
+    <div class="modal-sub">Ключ хранится только в памяти браузера и нигде не передаётся кроме api.claude-ai.shop</div>
+    <div class="form-group" style="margin-bottom:0">
+      <label class="form-label">Ключ</label>
+      <input class="form-input" type="password" placeholder="sk-ant-tsr-..." id="modal-key">
+    </div>
+    <div class="modal-actions">
+      <button class="btn-ghost" onclick="closeKeyModal()">Отмена</button>
+      <button class="btn-accent" onclick="saveKey()">Сохранить</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── state ──
+let currentUser = null;
+let apiKey = '';
+let selectedModel = 'claude-sonnet-4-6';
+let chatHistory = [];
+let isLoading = false;
+
+// ── navigation ──
+function showPage(name) {
+  document.querySelectorAll('.page').forEach(p => p.classList.add('hidden'));
+  document.getElementById('page-' + name).classList.remove('hidden');
+}
+
+// ── auth ──
+function doLogin() {
+  const email = document.getElementById('login-email').value.trim();
+  const key = document.getElementById('login-key').value.trim();
+  const name = email.split('@')[0] || 'Пользователь';
+  if (!email) { alert('Введите email'); return; }
+  currentUser = { name, email };
+  if (key) { apiKey = key; updateKeyBadge(); }
+  initChat();
+  showPage('chat');
+}
+
+function doRegister() {
+  const name = document.getElementById('reg-name').value.trim() || 'Пользователь';
+  const email = document.getElementById('reg-email').value.trim();
+  const key = document.getElementById('reg-key').value.trim();
+  if (!email) { alert('Введите email'); return; }
+  currentUser = { name, email };
+  if (key) { apiKey = key; updateKeyBadge(); }
+  initChat();
+  showPage('chat');
+}
+
+function doLogout() {
+  currentUser = null;
+  chatHistory = [];
+  document.getElementById('messages-area').innerHTML = '<div class="msg-wrap"><div class="welcome" id="welcome">' + welcomeHTML() + '</div></div>';
+  showPage('login');
+}
+
+function toggleLogout() {
+  const r = document.getElementById('logout-row');
+  r.style.display = r.style.display === 'none' ? 'flex' : 'none';
+}
+
+// ── chat init ──
+function initChat() {
+  const initials = currentUser.name.slice(0,1).toUpperCase();
+  document.getElementById('sidebar-avatar').textContent = initials;
+  document.getElementById('sidebar-name').textContent = currentUser.name;
+}
+
+function welcomeHTML() {
+  return `<svg class="welcome-icon" viewBox="0 0 52 52" fill="none">
+    <circle cx="26" cy="26" r="24" stroke="#d4a853" stroke-width="0.5" opacity="0.4"/>
+    <path d="M18 36 L26 18 L34 36" stroke="#d4a853" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+    <path d="M20.5 30.5 L31.5 30.5" stroke="#d4a853" stroke-width="1.5" stroke-linecap="round"/>
+  </svg>
+  <div class="welcome-title">Чем могу помочь?</div>
+  <div class="welcome-sub">Задайте вопрос или выберите один из вариантов ниже</div>
+  <div class="welcome-chips">
+    <div class="chip" onclick="sendChip('Объясни квантовые вычисления простыми словами')">Квантовые вычисления</div>
+    <div class="chip" onclick="sendChip('Напиши короткий рассказ о роботе, который хочет стать художником')">Написать рассказ</div>
+    <div class="chip" onclick="sendChip('Помоги разобраться с регулярными выражениями в Python')">Regex в Python</div>
+    <div class="chip" onclick="sendChip('Каковы плюсы и минусы удалённой работы?')">Удалённая работа</div>
+  </div>`;
+}
+
+// ── model ──
+function toggleModelDropdown() {
+  event.stopPropagation();
+  document.getElementById('model-dropdown').classList.toggle('open');
+}
+function selectModel(el) {
+  event.stopPropagation();
+  selectedModel = el.dataset.model;
+  document.getElementById('model-label').textContent = el.dataset.label;
+  document.querySelectorAll('.model-option').forEach(o => o.classList.remove('selected'));
+  el.classList.add('selected');
+  document.getElementById('model-dropdown').classList.remove('open');
+}
+document.addEventListener('click', () => {
+  document.getElementById('model-dropdown')?.classList.remove('open');
+});
+
+// ── key modal ──
+function openKeyModal() {
+  document.getElementById('modal-key').value = apiKey;
+  document.getElementById('key-modal').classList.add('open');
+}
+function closeKeyModal() {
+  document.getElementById('key-modal').classList.remove('open');
+}
+function saveKey() {
+  apiKey = document.getElementById('modal-key').value.trim();
+  updateKeyBadge();
+  closeKeyModal();
+}
+function updateKeyBadge() {
+  const el = document.getElementById('key-status');
+  el.textContent = apiKey ? 'Ключ активен' : 'Ключ не задан';
+}
+
+// ── messaging ──
+function handleKey(e) {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+}
+function autoResize(el) {
+  el.style.height = 'auto';
+  el.style.height = Math.min(el.scrollHeight, 140) + 'px';
+}
+function sendChip(text) {
+  document.getElementById('msg-input').value = text;
+  sendMessage();
+}
+
+function newChat() {
+  chatHistory = [];
+  const area = document.getElementById('messages-area');
+  area.innerHTML = '<div class="msg-wrap"><div class="welcome" id="welcome">' + welcomeHTML() + '</div></div>';
+  const items = document.querySelectorAll('.chat-item');
+  items.forEach(i => i.classList.remove('active'));
+}
+
+function selectChat(el) {
+  document.querySelectorAll('.chat-item').forEach(i => i.classList.remove('active'));
+  el.classList.add('active');
+}
+
+async function sendMessage() {
+  if (isLoading) return;
+  const input = document.getElementById('msg-input');
+  const text = input.value.trim();
+  if (!text) return;
+
+  const welcome = document.getElementById('welcome');
+  if (welcome) welcome.remove();
+
+  appendMessage('user', text);
+  chatHistory.push({ role: 'user', content: text });
+  input.value = '';
+  input.style.height = 'auto';
+
+  const thinkingEl = appendThinking();
+  isLoading = true;
+  document.getElementById('send-btn').disabled = true;
+
+  // update sidebar
+  const items = document.querySelector('.sidebar-chats');
+  if (document.querySelectorAll('.chat-item').length === 1) {
+    const first = document.querySelector('.chat-item');
+    first.textContent = text.slice(0, 32) + (text.length > 32 ? '…' : '');
+  }
+
+  if (!apiKey) {
+    await delay(600);
+    thinkingEl.remove();
+    appendMessage('ai', 'Пожалуйста, добавьте API-ключ Tessera — нажмите значок ключа в правом верхнем углу.');
+    isLoading = false;
+    document.getElementById('send-btn').disabled = false;
+    return;
+  }
+
+  try {
+    const res = await fetch('/api/messages', {
+      method: 'POST',
+      headers: {
+        'x-api-key': apiKey,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: selectedModel,
+        max_tokens: 1024,
+        messages: chatHistory
+      })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error?.message || 'Ошибка ' + res.status);
+    const reply = data.content?.[0]?.text || '(пустой ответ)';
+    chatHistory.push({ role: 'assistant', content: reply });
+    thinkingEl.remove();
+    appendMessage('ai', reply);
+  } catch(e) {
+    thinkingEl.remove();
+    appendMessage('ai', 'Ошибка: ' + e.message);
+  }
+
+  isLoading = false;
+  document.getElementById('send-btn').disabled = false;
+}
+
+function appendMessage(role, text) {
+  const area = document.getElementById('messages-area');
+  let wrap = area.querySelector('.msg-wrap:last-child');
+  if (!wrap) { wrap = document.createElement('div'); wrap.className = 'msg-wrap'; area.appendChild(wrap); }
+
+  const div = document.createElement('div');
+  div.className = 'message ' + role;
+
+  if (role === 'ai') {
+    div.innerHTML = `<div class="msg-header">
+      <svg class="ai-avatar" viewBox="0 0 24 24" fill="none">
+        <circle cx="12" cy="12" r="10" stroke="#d4a853" stroke-width="0.7" opacity="0.5"/>
+        <path d="M8 16 L12 8 L16 16" stroke="#d4a853" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M9.5 13.5 L14.5 13.5" stroke="#d4a853" stroke-width="1.2" stroke-linecap="round"/>
+      </svg>
+      <span class="ai-name">Claude</span>
+    </div>
+    <div class="msg-content">${escHtml(text).replace(/\n/g,'<br>')}</div>`;
+  } else {
+    div.innerHTML = `<div class="msg-content">${escHtml(text).replace(/\n/g,'<br>')}</div>`;
+  }
+
+  wrap.appendChild(div);
+  area.scrollTop = area.scrollHeight;
+  return div;
+}
+
+function appendThinking() {
+  const area = document.getElementById('messages-area');
+  let wrap = area.querySelector('.msg-wrap:last-child');
+  if (!wrap) { wrap = document.createElement('div'); wrap.className = 'msg-wrap'; area.appendChild(wrap); }
+
+  const div = document.createElement('div');
+  div.className = 'message ai';
+  div.innerHTML = `<div class="msg-header">
+    <svg class="ai-avatar" viewBox="0 0 24 24" fill="none">
+      <circle cx="12" cy="12" r="10" stroke="#d4a853" stroke-width="0.7" opacity="0.5"/>
+      <path d="M8 16 L12 8 L16 16" stroke="#d4a853" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M9.5 13.5 L14.5 13.5" stroke="#d4a853" stroke-width="1.2" stroke-linecap="round"/>
+    </svg>
+    <span class="ai-name">Claude</span>
+  </div>
+  <div class="thinking-dots"><span></span><span></span><span></span></div>`;
+
+  wrap.appendChild(div);
+  area.scrollTop = area.scrollHeight;
+  return div;
+}
+
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+function delay(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+// close modal on overlay click
+document.getElementById('key-modal').addEventListener('click', function(e) {
+  if (e.target === this) closeKeyModal();
+});
+</script>
+</body>
+</html>
